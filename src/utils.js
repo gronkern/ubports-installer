@@ -284,23 +284,51 @@ const platformToolsExec = (tool, arg, callback) => {
   var tools = getPlatformTools();
 
   // First check for native tools
+  var cmd = "";
   if (tools[tool]) {
-    logPlatformNativeToolsOnce();
-    var cmd = tools[tool] + " " + arg.join(" ");
-    log.debug("Running platform tool exec cmd "+cmd);
-    cp.exec(cmd, {maxBuffer: 2000*1024}, callbackHook(callback));
-    return true;
+      cmd = tools[tool] + " " + arg.join(" ");
   }
+  logPlatformNativeToolsOnce();
 
-  // Try using fallback tools
-  if (tools.fallback[tool]) {
-    logPlatformFallbackToolsOnce();
-    // log.debug("Running platform tool fallback exec cmd "+tools.fallback[tool] + " " + arg.join(" "));
-    cp.execFile(tools.fallback[tool], arg, {maxBuffer: 2000*1024}, callbackHook(callback));
-    return true;
+  if( tool == "adb" && (-1 !== cmd.indexOf("push") || -1 !== arg.join(" ").indexOf("push") )) {
+    //synchronous case for push
+    if (! tools[tool]) {
+       if (tools.fallback[tool]) {
+         // Try using fallback tools
+         cmd = tools.fallback[tool] + arg.join(" ");
+         log.debug("Running platform tool fallback exec cmd (workaround)"+cmd);
+       }
+    } else {
+      log.debug("Running platform tool exec cmd (workaround)"+cmd);
+    }
+    
+    var stdout;
+      try{
+        stdout = cp.execSync(cmd, {maxBuffer: 2000*1024});
+      }catch(e) {
+        log.error(e.error,e.stdout,e.stderr);
+        callback(e.error,e.stdout,e.stderr);
+      }
+      log.error(null,stdout,"");
+      callback(null,stdout,"");
+      return true;
+  } else {
+    if (tools[tool]) {
+      log.debug("Running platform tool exec cmd "+cmd);
+      cp.exec(cmd, {maxBuffer: 2000*1024}, callbackHook(callback));
+      return true;
+    }
+    
+    // Try using fallback tools
+    if (tools.fallback[tool]) {
+      cp.execFile(tools.fallback[tool], arg, {maxBuffer: 2000*1024}, callbackHook(callback));
+      return true;
+    }
   }
+  
   log.error("NO PLATFORM TOOL USED!");
   callback(true, false);
+  
   return false;
 }
 
