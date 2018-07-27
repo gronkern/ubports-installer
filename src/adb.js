@@ -151,30 +151,7 @@ var isBaseUbuntuCom = callback => {
 }
 
 var push = (file, dest, pushEvent) => {
-  var done;
-  var fileSize = fs.statSync(file)["size"];
-  utils.platformToolsExec("adb", ["-P", PORT, "push", "\"" + file.replace('"','\"') + "\"", dest], (err, stdout, stderr) => {
-    done=true;
-    if (err !== null) {
-      pushEvent.emit("adbpush:error", err+" stdout: " + stdout.length > 50*1024 ? "overflow" : stdout + " stderr: " + stderr.length > 50*1024 ? "overflow" : stderr)
-      console.log(stdout.length > 50*1024 ? "overflow" : stdout + " stderr: " + stderr.length > 50*1024 ? "overflow" : stderr)
-    }
-    else pushEvent.emit("adbpush:end")
-  });
-  var progress = () => {
-    setTimeout(function () {
-     shell("stat -t "+dest+"/"+path.basename(file), (stat) => {
-       try {
-         var currentSize = stat.split(" ")[1];
-         var percentage = Math.ceil((currentSize/fileSize)*100);
-         pushEvent.emit("adbpush:progress", percentage === NaN ? 100 : percentage);
-         if(!done && (currentSize < fileSize))
-          progress();
-       } catch (e) { }
-     })
-   }, 1000);
-  }
-  progress();
+  utils.platformToolsExec("adb", ["-P", PORT, "push", "\"" + file.replace('"','\"') + "\"", dest], null, pushEvent);
   return pushEvent;
 }
 

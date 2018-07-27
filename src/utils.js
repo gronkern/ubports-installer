@@ -280,7 +280,7 @@ const callbackHook = (callback) => {
   }
 }
 
-const platformToolsExec = (tool, arg, callback) => {
+const platformToolsExec = (tool, arg, callback, pushEvent) => {
   var tools = getPlatformTools();
 
   // First check for native tools
@@ -302,16 +302,39 @@ const platformToolsExec = (tool, arg, callback) => {
       log.debug("Running platform tool exec cmd (workaround)"+cmd);
     }
     
-    var stdout;
-      try{
-        stdout = cp.execSync(cmd, {maxBuffer: 2000*1024});
-      }catch(e) {
-        log.error(e.error,e.stdout,e.stderr);
-        callback(e.error,e.stdout,e.stderr);
-      }
-      log.error(null,stdout,"");
-      callback(null,stdout,"");
-      return true;
+    var buffer = "";
+    var regex = /\[([^%]+)%\].*/g;
+    var oldmatch = "";
+    var stdout, stderr, std3;
+    var childProcess = cp.exec(cmd, {maxBuffer: 2000*1024}, callbackHook(callback));
+    
+    childProcess.stdout.on('data', (data) => {
+        buffer += data.toString();
+        var match;
+        while((null !== (match = regex.exec(buffer))) && (match.length > 0)) {
+            var tmp = match[1].trim();
+            if(tmp !== oldmatch) {
+                pushEvent.emit("adbpush:progress", match[1]);
+                oldmatch = tmp;
+            }
+            buffer = buffer.substring(regex.lastIndex);
+        }
+        
+        return true;
+    });
+    
+    childProcess.stdout.on('exit', (code, signal) => {
+		if(0 == code) {
+			pushEvent.emit("adbpush:end");
+		}else{
+			pushEvent.emit("adbpush:error", "processing '" + file + "' exited with code " + code + " and signal " + signal);
+		}
+		
+		return true;
+    });
+
+    return true;
+
   } else {
     if (tools[tool]) {
       log.debug("Running platform tool exec cmd "+cmd);
